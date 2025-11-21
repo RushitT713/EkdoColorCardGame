@@ -1,0 +1,115 @@
+﻿@{
+    ViewData["Title"] = "Game Lobby";
+}
+
+<div class="lobby-container">
+    <div class="lobby-header fade-in">
+        <h1>Welcome to Color Card</h1>
+        <p>A fun, family-friendly multiplayer card game!</p>
+    </div>
+
+    <div class="game-card-single fade-in">
+        <div class="game-image-header">
+            <div style="font-size: 8rem; text-shadow: 0 4px 20px rgba(0,0,0,0.3);">🎨</div>
+        </div>
+
+        <div class="game-content">
+            <h2 class="game-title">Color Card</h2>
+            <p class="game-subtitle">Fast-paced multiplayer card game</p>
+
+            <div class="game-features">
+                <span class="feature-badge">🎮 2-5 Players</span>
+                <span class="feature-badge">🎯 Quick Rounds</span>
+                <span class="feature-badge">🏆 Track Stats</span>
+            </div>
+
+            <div class="form-group">
+                <label for="playerName">Display Name</label>
+                <input type="text"
+                       id="playerName"
+                       class="form-control"
+                       placeholder="Enter your name"
+                       value="@ViewBag.PlayerName" />
+            </div>
+
+            <button onclick="createLobby()" class="btn btn-primary btn-block">
+                Create New Game
+            </button>
+
+            <div class="divider">
+                <span>OR</span>
+            </div>
+
+            <div class="form-group">
+                <label for="joinCode">Game Code</label>
+                <input type="text"
+                       id="joinCode"
+                       class="form-control"
+                       placeholder="Enter 5-digit code"
+                       maxlength="5"
+                       style="text-transform: uppercase;" />
+            </div>
+
+            <button onclick="joinLobby()" class="btn btn-secondary btn-block">
+                Join Game
+            </button>
+
+            <div class="rules-box">
+                <h5>How to Play</h5>
+                <ul>
+                    <li>Match cards by color or number</li>
+                    <li>Use action cards strategically</li>
+                    <li>Play Wild cards to change colors</li>
+                    <li>Call "UNO!" with one card left</li>
+                    <li>First to empty hand wins!</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        function generateCode() {
+            return Math.random().toString(36).substr(2, 5).toUpperCase();
+        }
+
+        function createLobby() {
+            const name = document.getElementById("playerName").value.trim();
+            if (!name) {
+                alert("Please enter your name");
+                return;
+            }
+            const code = generateCode();
+            window.location = `/ColorCard?lobbyCode=${code}&playerName=${encodeURIComponent(name)}`;
+        }
+
+        function joinLobby() {
+            const name = document.getElementById("playerName").value.trim();
+            const code = document.getElementById("joinCode").value.toUpperCase().trim();
+
+            if (!name) {
+                alert("Please enter your name");
+                return;
+            }
+            if (!code) {
+                alert("Please enter a game code");
+                return;
+            }
+
+            window.location = `/ColorCard?lobbyCode=${code}&playerName=${encodeURIComponent(name)}`;
+        }
+
+        document.getElementById("joinCode").addEventListener("input", function(e) {
+            e.target.value = e.target.value.toUpperCase();
+        });
+
+        document.getElementById("playerName").addEventListener("keypress", function(e) {
+            if (e.key === "Enter") createLobby();
+        });
+
+        document.getElementById("joinCode").addEventListener("keypress", function(e) {
+            if (e.key === "Enter") joinLobby();
+        });
+    </script>
+}

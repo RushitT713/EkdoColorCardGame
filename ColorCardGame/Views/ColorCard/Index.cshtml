@@ -1,0 +1,434 @@
+﻿@{
+    ViewData["Title"] = "Color Card Game";
+    var lobbyCode = (string)ViewBag.LobbyCode;
+    var playerName = (string)ViewBag.PlayerName;
+}
+
+<div class="game-container">
+    <!-- Reconnect Loader -->
+    <div id="reconnect-loader" class="loader-overlay" style="display: flex;">
+        <div class="spinner"></div>
+        <p id="connection-status">Connecting to game...</p>
+    </div>
+
+    <!-- Lobby Screen -->
+    <div id="lobby-screen" style="display: none;">
+        <div class="lobby-box">
+            <h2>🎨 Color Card</h2>
+            <div class="lobby-code">@lobbyCode</div>
+            <h4>Players in Lobby</h4>
+            <ul id="player-list" class="player-list"></ul>
+            <button id="btn-start" class="btn btn-primary" style="display: none;" onclick="startGame()">
+                Start Game
+            </button>
+            <p class="waiting-text">Waiting for host to start...</p>
+        </div>
+    </div>
+
+    <!-- Game Screen -->
+    <div id="game-screen" style="display: none;">
+        <div class="game-layout">
+            <!-- Game Area -->
+            <div class="game-area">
+                <!-- Top Info Bar -->
+                <div class="game-info-bar">
+                    <div class="info-item">
+                        <i class="fas fa-arrow-right" id="direction-icon"></i>
+                        <span id="direction-text">Clockwise</span>
+                    </div>
+                    <div class="info-item">
+                        <span>Current: </span>
+                        <strong id="current-player">-</strong>
+                    </div>
+                    <div class="info-item">
+                        <span>Deck: </span>
+                        <strong id="deck-count">108</strong>
+                    </div>
+                </div>
+
+                <!-- Other Players (Top) -->
+                <div id="top-players" class="other-players-row"></div>
+
+                <!-- Center Play Area -->
+                <div class="play-area">
+                    <div class="center-cards">
+                        <div class="deck-pile" onclick="drawCard()">
+                            <div class="deck-icon">🎴</div>
+                            <div class="deck-label">Draw</div>
+                        </div>
+                        <div id="discard-pile" class="discard-pile"></div>
+                    </div>
+
+                    <div id="color-prompt" class="color-selector" style="display: none;">
+                        <h4>Choose a Color</h4>
+                        <div class="color-grid">
+                            <button class="color-btn red" onclick="chooseColor('Red')">Red</button>
+                            <button class="color-btn blue" onclick="chooseColor('Blue')">Blue</button>
+                            <button class="color-btn green" onclick="chooseColor('Green')">Green</button>
+                            <button class="color-btn yellow" onclick="chooseColor('Yellow')">Yellow</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- My Hand -->
+                <div class="my-hand-area">
+                    <div class="hand-header">
+                        <h4>Your Hand</h4>
+                        <button id="btn-uno" class="btn-uno" onclick="callUno()" style="display: none;">
+                            🎉 UNO!
+                        </button>
+                    </div>
+                    <div id="my-hand" class="card-hand"></div>
+                </div>
+            </div>
+
+            <!-- Side Panel -->
+            <div class="side-panel">
+                <div class="panel-section">
+                    <h5>Current Color</h5>
+                    <div id="current-color-display" class="color-display">-</div>
+                </div>
+
+                <div class="panel-section">
+                    <h5>Activity Log</h5>
+                    <div id="game-log" class="activity-log"></div>
+                </div>
+
+                <div class="panel-section">
+                    <h5>Players</h5>
+                    <div id="player-status" class="player-status-list"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Game Over Modal -->
+    <div id="game-over-modal" class="modal-overlay" style="display: none;">
+        <div class="modal-content">
+            <h2>🎉</h2>
+            <h3 id="winner-name"></h3>
+            <div id="final-scores" class="scores-list"></div>
+            <p class="restart-text">Starting new round...</p>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/microsoft-signalr/7.0.5/signalr.min.js"></script>
+    <script>
+        console.log("🎮 Color Card Game - Starting...");
+        console.log("Lobby Code:", "@lobbyCode");
+        console.log("Player Name:", "@playerName");
+
+        // Check if SignalR is loaded
+        if (typeof signalR === 'undefined') {
+            console.error("❌ SignalR library not loaded!");
+            document.getElementById('connection-status').textContent = "Error: SignalR library not loaded!";
+        } else {
+            console.log("✅ SignalR library loaded");
+        }
+
+        const connection = new signalR.HubConnectionBuilder()
+            .withUrl("/hubs/colorcard")
+            .withAutomaticReconnect()
+            .configureLogging(signalR.LogLevel.Information)
+            .build();
+
+        let myConnectionId = null;
+        let creatorConnectionId = null;
+        let currentGameState = null;
+
+        // Connection events
+        connection.onreconnecting(() => {
+            console.log("🔄 Reconnecting...");
+            document.getElementById('connection-status').textContent = "Reconnecting...";
+        });
+
+        connection.onreconnected(() => {
+            console.log("✅ Reconnected!");
+        });
+
+        connection.onclose(() => {
+            console.log("❌ Connection closed");
+            document.getElementById('connection-status').textContent = "Connection lost. Retrying...";
+            setTimeout(startConnection, 2000);
+        });
+
+        // Server events
+        connection.on("SetConnectionId", id => {
+            console.log("📡 Connection ID received:", id);
+            myConnectionId = id;
+        });
+
+        connection.on("UpdatePlayerList", (players, creatorId) => {
+            console.log("👥 Player list updated:", players);
+            creatorConnectionId = creatorId;
+            const ul = document.getElementById('player-list');
+            ul.innerHTML = players.map(name => `<li>${name}</li>`).join('');
+
+            const isCreator = (myConnectionId === creatorConnectionId);
+            console.log("Am I creator?", isCreator);
+            document.getElementById('btn-start').style.display = isCreator ? "block" : "none";
+        });
+
+        connection.on("GameStarted", () => {
+            console.log("🎮 Game started!");
+            document.getElementById('lobby-screen').style.display = 'none';
+            document.getElementById('game-screen').style.display = 'flex';
+        });
+
+        connection.on("GameState", state => {
+            console.log("📊 Game state updated:", state);
+            currentGameState = state;
+            updateUI(state);
+        });
+
+        connection.on("YourTurn", () => {
+            console.log("⏰ Your turn!");
+            showNotification("It's your turn!", 'success');
+        });
+
+        connection.on("ChooseColorPrompt", () => {
+            console.log("🎨 Choose color prompt");
+            document.getElementById('color-prompt').style.display = 'block';
+        });
+
+        connection.on("CanPlayDrawnCard", () => {
+            console.log("✅ Can play drawn card");
+            showNotification("You can play that card!", 'success');
+        });
+
+        connection.on("PlayerDisconnected", name => {
+            console.log("👋 Player disconnected:", name);
+            showNotification(`${name} disconnected`, 'error');
+        });
+
+        connection.on("GameOver", result => {
+            console.log("🏆 Game over:", result);
+            showGameOver(result);
+        });
+
+        connection.on("Error", msg => {
+            console.error("❌ Server error:", msg);
+            showNotification(msg, 'error');
+        });
+
+        async function startConnection() {
+            console.log("🔌 Attempting to connect to SignalR hub...");
+            try {
+                await connection.start();
+                console.log("✅ Connected to SignalR hub");
+
+                console.log("📞 Joining lobby...");
+                await connection.invoke("JoinLobby", "@lobbyCode", "@playerName");
+                console.log("✅ Joined lobby successfully");
+
+                document.getElementById('reconnect-loader').style.display = 'none';
+                document.getElementById('lobby-screen').style.display = 'flex';
+            } catch (err) {
+                console.error("❌ Connection error:", err);
+                document.getElementById('connection-status').textContent =
+                    `Connection failed: ${err.message}. Retrying in 2 seconds...`;
+                setTimeout(startConnection, 2000);
+            }
+        }
+
+        async function startGame() {
+            console.log("🎮 Starting game...");
+            try {
+                await connection.invoke("StartGame", "@lobbyCode");
+                console.log("✅ Start game command sent");
+            } catch (err) {
+                console.error("❌ Start game error:", err);
+                showNotification("Failed to start game: " + err.message, 'error');
+            }
+        }
+
+        async function playCard(index) {
+            console.log("🃏 Playing card at index:", index);
+            if (!currentGameState?.isMyTurn) {
+                console.warn("⚠️ Not your turn!");
+                showNotification("It's not your turn!", 'error');
+                return;
+            }
+            try {
+                await connection.invoke("PlayerAction", "@lobbyCode", {
+                    Action: "PlayCard",
+                    CardIndex: index
+                });
+                console.log("✅ Play card command sent");
+            } catch (err) {
+                console.error("❌ Play card error:", err);
+                showNotification("Failed to play card: " + err.message, 'error');
+            }
+        }
+
+        async function drawCard() {
+            console.log("📥 Drawing card...");
+            if (!currentGameState?.isMyTurn) {
+                console.warn("⚠️ Not your turn!");
+                showNotification("It's not your turn!", 'error');
+                return;
+            }
+            try {
+                await connection.invoke("PlayerAction", "@lobbyCode", {
+                    Action: "DrawCard"
+                });
+                console.log("✅ Draw card command sent");
+            } catch (err) {
+                console.error("❌ Draw card error:", err);
+                showNotification("Failed to draw card: " + err.message, 'error');
+            }
+        }
+
+        async function callUno() {
+            console.log("🎉 Calling UNO!");
+            try {
+                await connection.invoke("PlayerAction", "@lobbyCode", {
+                    Action: "CallUno"
+                });
+                console.log("✅ Call UNO command sent");
+            } catch (err) {
+                console.error("❌ Call UNO error:", err);
+            }
+        }
+
+        async function chooseColor(color) {
+            console.log("🎨 Choosing color:", color);
+            try {
+                await connection.invoke("PlayerAction", "@lobbyCode", {
+                    Action: "ChooseColor",
+                    ChosenColor: color
+                });
+                console.log("✅ Choose color command sent");
+                document.getElementById('color-prompt').style.display = 'none';
+            } catch (err) {
+                console.error("❌ Choose color error:", err);
+            }
+        }
+
+        function updateUI(state) {
+            console.log("🎨 Updating UI...");
+
+            document.getElementById('deck-count').textContent = state.deckCount;
+            document.getElementById('direction-icon').className =
+                `fas fa-arrow-${state.isClockwise ? 'right' : 'left'}`;
+            document.getElementById('direction-text').textContent =
+                state.isClockwise ? 'Clockwise' : 'Counter-Clockwise';
+
+            if (state.topCard) {
+                const [color, value] = state.topCard.split('_');
+                document.getElementById('discard-pile').innerHTML =
+                    createCardHTML(color, value, -1);
+            }
+
+            if (state.players.length > state.currentPlayerIndex) {
+                document.getElementById('current-player').textContent =
+                    state.players[state.currentPlayerIndex].name;
+            }
+
+            const colorDisplay = document.getElementById('current-color-display');
+            if (state.currentColor) {
+                colorDisplay.textContent = state.currentColor;
+                colorDisplay.className = `color-display ${state.currentColor.toLowerCase()}`;
+            }
+
+            const myHand = document.getElementById('my-hand');
+            myHand.innerHTML = state.myHand.map(card => {
+                const [color, value] = card.card.split('_');
+                return createCardHTML(color, value, card.index);
+            }).join('');
+
+            const topPlayers = document.getElementById('top-players');
+            topPlayers.innerHTML = state.players
+                .filter(p => p.name !== "@playerName")
+                .map((p, idx) => `
+                    <div class="player-card ${idx === state.currentPlayerIndex ? 'active' : ''}">
+                        <div class="player-name">${p.name}</div>
+                        <div class="card-count">🎴 ${p.cardCount}</div>
+                        ${p.hasCalledUno ? '<div class="uno-badge">UNO!</div>' : ''}
+                    </div>
+                `).join('');
+
+            const playerStatus = document.getElementById('player-status');
+            playerStatus.innerHTML = state.players.map((p, idx) => `
+                <div class="status-item ${idx === state.currentPlayerIndex ? 'active' : ''}">
+                    <span>${p.name}</span>
+                    <span>${p.cardCount} 🎴</span>
+                </div>
+            `).join('');
+
+            const logDiv = document.getElementById('game-log');
+            logDiv.innerHTML = state.gameLog.map(entry =>
+                `<div class="log-entry">${entry}</div>`
+            ).join('');
+            logDiv.scrollTop = logDiv.scrollHeight;
+
+            const myPlayer = state.players.find(p => p.name === "@playerName");
+            document.getElementById('btn-uno').style.display =
+                (myPlayer && myPlayer.cardCount === 1 && !myPlayer.hasCalledUno) ? 'block' : 'none';
+        }
+
+        function createCardHTML(color, value, index) {
+            const colorClass = color.toLowerCase();
+            const displayValue = value.replace(/([A-Z])/g, ' $1').trim();
+            const onclick = index >= 0 ? `onclick="playCard(${index})"` : '';
+
+            return `
+                <div class="uno-card ${colorClass}" ${onclick}>
+                    <div class="card-color">${color}</div>
+                    <div class="card-value">${displayValue}</div>
+                </div>
+            `;
+        }
+
+        function showGameOver(result) {
+            document.getElementById('winner-name').textContent = `${result.winnerName} Wins!`;
+
+            const scoresDiv = document.getElementById('final-scores');
+            scoresDiv.innerHTML = '<h4>Final Scores</h4>' +
+                result.finalScores.map(score => `
+                    <div class="score-item">
+                        <span>${score.name}</span>
+                        <span>${score.cardsLeft} cards (${score.points} pts)</span>
+                    </div>
+                `).join('');
+
+            document.getElementById('game-over-modal').style.display = 'flex';
+            setTimeout(() => {
+                document.getElementById('game-over-modal').style.display = 'none';
+            }, 5000);
+        }
+
+        function showNotification(message, type) {
+            console.log(`📢 Notification [${type}]:`, message);
+            const notification = document.createElement('div');
+            notification.textContent = message;
+            notification.className = `notification ${type}`;
+            notification.style.cssText = `
+                position: fixed;
+                top: 100px;
+                right: -400px;
+                padding: 1rem 1.5rem;
+                border-radius: 12px;
+                font-weight: 600;
+                z-index: 9999;
+                box-shadow: 0 8px 30px rgba(0, 0, 0, 0.4);
+                background: ${type === 'error' ? 'var(--danger)' : 'var(--success)'};
+                color: white;
+                transition: right 0.3s ease;
+            `;
+            document.body.appendChild(notification);
+
+            setTimeout(() => notification.style.right = '20px', 10);
+            setTimeout(() => {
+                notification.style.right = '-400px';
+                setTimeout(() => notification.remove(), 300);
+            }, 3000);
+        }
+
+        // Start the connection when page loads
+        console.log("🚀 Initializing game...");
+        startConnection();
+    </script>
+}

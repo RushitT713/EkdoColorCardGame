@@ -1,0 +1,89 @@
+﻿@{
+    ViewData["Title"] = "My Stats";
+    var myStats = ViewBag.MyStats as ColorCardGame.Models.PlayerStats;
+    var leaderboard = ViewBag.Leaderboard as List<ColorCardGame.Models.PlayerStats>;
+    var myPlayerId = ViewBag.PlayerId as string;
+}
+
+<div class="stats-container">
+    <div class="stats-header fade-in">
+        <h1>Player Statistics</h1>
+        <p>Your Color Card game performance</p>
+    </div>
+
+    <!-- My Stats Cards -->
+    <div class="stats-grid fade-in">
+        <div class="stat-card">
+            <div class="stat-label">Total Games</div>
+            <div class="stat-value primary">@myStats.TotalGames</div>
+        </div>
+
+        <div class="stat-card">
+            <div class="stat-label">Wins</div>
+            <div class="stat-value success">@myStats.Wins</div>
+        </div>
+
+        <div class="stat-card">
+            <div class="stat-label">Losses</div>
+            <div class="stat-value danger">@myStats.Losses</div>
+        </div>
+
+        <div class="stat-card">
+            <div class="stat-label">Win Rate</div>
+            <div class="stat-value primary">@myStats.WinRate.ToString("F1")%</div>
+        </div>
+    </div>
+
+    <!-- Leaderboard -->
+    <div class="leaderboard-section fade-in">
+        <div class="section-header">
+            <h2>🏆 Leaderboard</h2>
+        </div>
+
+        @if (leaderboard == null || leaderboard.Count == 0)
+        {
+            <div class="empty-state">
+                <p>No data yet. Play some games to appear on the leaderboard!</p>
+            </div>
+        }
+        else
+        {
+            <div class="leaderboard-table">
+                <div class="table-header">
+                    <div>Rank</div>
+                    <div>Player</div>
+                    <div>Games</div>
+                    <div>Wins</div>
+                    <div>Win Rate</div>
+                </div>
+
+                @for (int i = 0; i < leaderboard.Count; i++)
+                {
+                    var stats = leaderboard[i];
+                    var rankIcon = i == 0 ? "🥇" : i == 1 ? "🥈" : i == 2 ? "🥉" : (i + 1).ToString();
+                    var isMe = stats.Player.PlayerId == myPlayerId;
+
+                    <div class="table-row @(isMe ? "highlight" : "")">
+                        <div class="rank">@rankIcon</div>
+                        <div class="player-name">
+                            @stats.Player.DisplayName
+                            @if (isMe)
+                            {
+                                <span class="you-badge">You</span>
+                            }
+                        </div>
+                        <div>@stats.TotalGames</div>
+                        <div class="wins">@stats.Wins</div>
+                        <div class="win-rate">@stats.WinRate.ToString("F1")%</div>
+                    </div>
+                }
+            </div>
+        }
+    </div>
+
+    <div class="action-buttons fade-in">
+        <a href="/Lobby" class="btn btn-primary">
+            <i class="fas fa-play"></i> Play Another Game
+        </a>
+    </div>
+</div>
