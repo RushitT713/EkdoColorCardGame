@@ -104,8 +104,9 @@ namespace ColorCardGame.Services
             return await _context.PlayerStats
                 .Include(s => s.Player)
                 .Where(s => s.TotalGames > 0)
+                // Fix: Calculate WinRate logic directly in the query so SQL can understand it
                 .OrderByDescending(s => s.Wins)
-                .ThenByDescending(s => s.WinRate)
+                .ThenByDescending(s => (double)s.Wins / s.TotalGames)
                 .ThenBy(s => s.Losses)
                 .Take(count)
                 .ToListAsync();

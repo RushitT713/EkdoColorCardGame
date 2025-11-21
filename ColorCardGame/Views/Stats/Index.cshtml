@@ -11,30 +11,28 @@
         <p>Your Color Card game performance</p>
     </div>
 
-    <!-- My Stats Cards -->
     <div class="stats-grid fade-in">
         <div class="stat-card">
             <div class="stat-label">Total Games</div>
-            <div class="stat-value primary">@myStats.TotalGames</div>
+            <div class="stat-value primary">@myStats?.TotalGames</div>
         </div>
 
         <div class="stat-card">
             <div class="stat-label">Wins</div>
-            <div class="stat-value success">@myStats.Wins</div>
+            <div class="stat-value success">@myStats?.Wins</div>
         </div>
 
         <div class="stat-card">
             <div class="stat-label">Losses</div>
-            <div class="stat-value danger">@myStats.Losses</div>
+            <div class="stat-value danger">@myStats?.Losses</div>
         </div>
 
         <div class="stat-card">
             <div class="stat-label">Win Rate</div>
-            <div class="stat-value primary">@myStats.WinRate.ToString("F1")%</div>
+            <div class="stat-value primary">@myStats?.WinRate.ToString("F1")%</div>
         </div>
     </div>
 
-    <!-- Leaderboard -->
     <div class="leaderboard-section fade-in">
         <div class="section-header">
             <h2>🏆 Leaderboard</h2>
